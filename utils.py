@@ -3,17 +3,19 @@ This file contains class and modules for configuration and setup.
 
 """
 import os
+import fasttext
 
 class Config:
     def __init__(self):
         # Define dataset path
-        Dataset_dir = os.path.join(os.getcwd(), 'Dataset')
-        Original_lastfm_dir = os.path.join(Dataset_dir, 'lastfm-dataset-1K')
-        Original_user_track_dir = os.path.join(Original_lastfm_dir, 'userid-timestamp-artid-artname-traid-traname.tsv')
-        Original_user_profile_dir = os.path.join(Original_lastfm_dir, 'userid-profile.tsv')
-        Processed_dataset_dir = os.path.join(Dataset_dir, 'Final_dataset.csv')
-        Test_dataset_dir = os.path.join(Dataset_dir, 'Test_sample.csv')
+        self.Dataset_dir = os.path.join(os.getcwd(), 'Dataset')
+        self.Original_lastfm_dir = os.path.join(self.Dataset_dir, 'lastfm-dataset-1K')
+        self.Original_user_track_dir = os.path.join(self.Original_lastfm_dir, 'userid-timestamp-artid-artname-traid-traname.tsv')
+        self.Original_user_profile_dir = os.path.join(self.Original_lastfm_dir, 'userid-profile.tsv')
+        self.Processed_dataset_dir = os.path.join(self.Dataset_dir, 'Final_dataset.csv')
+        self.Test_dataset_dir = os.path.join(self.Dataset_dir, 'Test_sample.csv')
 
+        # Data preprocessing configurations
         self.max_valid_seq_len = 500
         self.max_session_len = 30
         self.min_session_len = 2

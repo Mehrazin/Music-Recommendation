@@ -72,7 +72,7 @@ def clean_data(data, config):
 
 
 
-if __init__ == '__main__':
+if __name__ == '__main__':
     config = Config()
     data = load_data(config)
     data = lang_detect(data, config)
