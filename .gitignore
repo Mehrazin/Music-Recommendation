@@ -1,0 +1,9 @@
+# Jupyter notenook output
+__pycache__
+.ipynb_checkpoints/
+
+#Dataset
+Dataset
+
+# Utils
+utils
