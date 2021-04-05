@@ -51,11 +51,68 @@ def load_data(config):
 #             langs.append(str(lang)[11:13])
 #         data[out_name[index]] = langs
 #     return data
+class Data_handler():
+    """
+    This class helps to handle the dataset easier by providing useful atributes and methods.
+    """
+    def __init__(self,config):
+        self.data = load_data(config)
+        self.users = self.get_val_list('user_id')
+        self.artists = self.get_val_list('artist_name')
+        self.tracks = self.get_val_list('track_name')
+
+
+    def get_val_list(self, col_name):
+        assert col_name in list(self.data.columns)
+        values = list(self.data[col_name])
+        values = list(dict.fromkeys(values))
+        return values
+
+    def get_masked_data(self, users, fracs, method = 'from_the_top'):
+        """
+        This method outputs a dataset that has a fraction of the original dataset's users.
+        Both users and fractions are givven as input to the method. This methid is very useful
+        in unit-testing process.
+        """
+        assert len(users) == len(fracs)
+        if method == 'from_the_top':
+            sub_data = pd.DataFrame(columns = self.data.columns)
+            for i, user in enumerate(users) :
+                temp_df = self.data[self.data.user_id == user]
+                new_len = int(float(fracs[i]*len(temp_df)))
+                temp_df = temp_df[:new_len]
+                sub_data = pd.concat([sub_data, temp_df])
+        return sub_data
+
+
+
+
+
 
 def clean_data(data, config):
-    if config.keep_lang:
-        for col_name in config.col_lang_name:
-            data = data[data[col_name] == config.keep_lang]
+    if 'rm_non_en' in config.clean_mode:
+        # Remove non-English values
+        if config.keep_lang:
+            for col_name in config.col_lang_name:
+                data = data[data[col_name] == config.keep_lang]
+    if 'rm_small_sess' in config.clean_mode:
+        # Remove session that are too small
+        temp_df = pd.DataFrame(data.Session.value_counts())
+        temp_df.reset_index(inplace = True)
+        temp_df.columns = ['Session', 'len']
+        if config.sanity_check:
+            sc = pd.DataFrame(temp_df[temp_df.len < config.min_session_len])
+            not_val_sess = list(sc['Session'])
+        temp_df = temp_df[temp_df.len >= config.min_session_len]
+        temp_df = temp_df[['Session']]
+        data = pd.merge(data, temp_df, how = 'inner', on = ["Session"])
+        data.sort_values(['user_id', 'timestamp'], ascending=True, inplace=True)
+        data.reset_index(inplace = True, drop = True)
+        if config.sanity_check:
+            curr_sess = list(data.Session)
+            curr_sess = list(dict.fromkeys(curr_sess))
+            for sess in not_val_sess:
+                assert sess not in curr_sess
     return data
 
 def create_session(data, config):
@@ -92,6 +149,8 @@ def create_session(data, config):
     new_data.reset_index(inplace = True, drop = True)
     assert len(new_data) == len(data)
     return new_data
+
+
 
 
 
