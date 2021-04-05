@@ -113,6 +113,24 @@ def clean_data(data, config):
             curr_sess = list(dict.fromkeys(curr_sess))
             for sess in not_val_sess:
                 assert sess not in curr_sess
+
+    if 'rm_small_users' :
+        temp_df = pd.DataFrame(data.groupby('user_id')['Session'].nunique())
+        temp_df.reset_index(inplace = True)
+        temp_df.columns = ['user_id', 'len']
+        if config.sanity_check:
+            sc = pd.DataFrame(temp_df[temp_df.len < config.min_session_per_user])
+            not_val_users = list(sc['user_id'])
+        temp_df = temp_df[temp_df.len >= config.min_session_per_user]
+        temp_df = temp_df[['user_id']]
+        data = pd.merge(data, temp_df, how = 'inner', on = ["user_id"])
+        data.sort_values(['user_id', 'timestamp'], ascending=True, inplace=True)
+        data.reset_index(inplace = True, drop = True)
+        if config.sanity_check:
+            curr_users = list(data.user_id)
+            curr_users = list(dict.fromkeys(curr_sess))
+            for user in not_val_users:
+                assert user not in curr_users
     return data
 
 def create_session(data, config):
