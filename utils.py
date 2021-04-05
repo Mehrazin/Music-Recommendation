@@ -23,10 +23,11 @@ class Config:
         self.time_interval = 3600
         self.load_raw_data = False
         self.keep_lang = 'en'
+        self.clean_mode = ['rm_small_sess']
         self.col_lang_detect = ['artist_name']
         self.col_lang_name = ['artist_lang']
-        self.test_mode = False
-
+        self.test_mode = True
+        self.sanity_check = True
 # class LanguageIdentification:
 #
 #     def __init__(self):
