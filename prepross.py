@@ -5,6 +5,7 @@ This module contains files for preproccesing the data and defining sessions and 
 from utils import Config
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 
 def load_data(config):
     """
@@ -113,8 +114,17 @@ def clean_data(data, config):
             curr_sess = list(dict.fromkeys(curr_sess))
             for sess in not_val_sess:
                 assert sess not in curr_sess
+    if 'rm_small_sub_session' in config.clean_mode:
+        temp_df = pd.DataFrame(data.groupby(['Session', 'sub_session'])['timestamp'].count())
+        temp_df.reset_index(inplace = True)
+        temp_df.columns = ['Session', 'sub_session', 'len']
+        temp_df = temp_df[temp_df.len >= config.min_session_len]
+        temp_df = temp_df[['Session', 'sub_session']]
+        data = pd.merge(data, temp_df, how = 'inner', on = ["Session", 'sub_session'])
+        data.sort_values(['user_id', 'timestamp'], ascending=True, inplace=True)
+        data.reset_index(inplace = True, drop = True)
 
-    if 'rm_small_users' :
+    if 'rm_small_users' in config.clean_mode:
         temp_df = pd.DataFrame(data.groupby('user_id')['Session'].nunique())
         temp_df.reset_index(inplace = True)
         temp_df.columns = ['user_id', 'len']
@@ -131,6 +141,39 @@ def clean_data(data, config):
             curr_users = list(dict.fromkeys(curr_sess))
             for user in not_val_users:
                 assert user not in curr_users
+    return data
+
+def cut_sessions(data, config):
+    """
+    This function devides each session whose length is greater than config.max_session_len to sub_sessions whose length equals to max_session_len.
+    """
+    data['sub_session'] = ''
+    temp_df = pd.DataFrame(data.Session.value_counts())
+    temp_df.reset_index(inplace = True)
+    temp_df.columns = ['Session', 'len']
+    sess = list(temp_df.Session)
+    l = list(temp_df.len)
+    dic = dict(zip(sess, l))
+    curr_sess = list(data.Session)
+    curr_sess = list(dict.fromkeys(curr_sess))
+    sub = np.array([0]).reshape((1,-1))
+    for se in curr_sess :
+        if dic[se] > config.max_session_len :
+            i = int(dic[se]/config.max_session_len)
+            r = dic[se] - i*config.max_session_len
+            x = np.arange(1, i+1).reshape((1,-1))
+            l = np.repeat(x, config.max_session_len, axis=1)
+            if r != 0:
+                a = np.arange(i+1, i+2).reshape((1,-1))
+                a = np.repeat(a, r, axis=1)
+                l = np.append(l, a, axis = 1)
+        else:
+            x = np.arange(1, 2).reshape((1,-1))
+            l = np.repeat(x, dic[se], axis=1)
+        sub = np.append(sub,l, axis = 1)
+    sub = sub.astype(int)
+    sub = sub[0][1:].reshape((1,-1))
+    data['sub_session'] = np.squeeze(sub)
     return data
 
 def create_session(data, config):
@@ -187,6 +230,9 @@ def create_session(data, config):
 
 if __name__ == '__main__':
     config = Config()
-    data = load_data(config)
-    # data = lang_detect(data, config)
-    data = create_session(data, config)
+    df = Data_handler(config)
+    df.data = create_session(df.data, config)
+    df.data = clean_data(df.data, config)
+    df.data = cut_sessions(df.data, config)
+    config.clean_mode = ['rm_small_sub_session']
+    df.data = clean_data(df.data, config)

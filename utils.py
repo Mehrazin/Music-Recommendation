@@ -17,7 +17,7 @@ class Config:
 
         # Data preprocessing configurations
         self.max_valid_seq_len = 500
-        self.max_session_len = 30
+        self.max_session_len = 20
         self.min_session_len = 2
         self.min_session_per_user = 5
         self.time_interval = 3600
