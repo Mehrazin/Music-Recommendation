@@ -6,6 +6,9 @@ from utils import Config
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
+from dataloader import Vocab
+import pickle
+import os
 
 def load_data(config):
     """
@@ -52,12 +55,23 @@ def load_data(config):
 #             langs.append(str(lang)[11:13])
 #         data[out_name[index]] = langs
 #     return data
+
 class Data_handler():
     """
     This class helps to handle the dataset easier by providing useful atributes and methods.
     """
-    def __init__(self,config):
-        self.data = load_data(config)
+    def __init__(self,config, **kwargs):
+        if 'data' in kwargs.keys():
+            self.data = kwargs['data']
+        else:
+            self.data = load_data(config)
+        self.users = []
+        self.artists = []
+        self.tracks = []
+        self.sessions = []
+        self.update()
+
+    def update(self):
         self.users = self.get_val_list('user_id')
         self.artists = self.get_val_list('artist_name')
         self.tracks = self.get_val_list('track_name')
@@ -115,6 +129,7 @@ def clean_data(data, config):
             for sess in not_val_sess:
                 assert sess not in curr_sess
     if 'rm_small_sub_session' in config.clean_mode:
+        # Remove sub-sessions with small length
         temp_df = pd.DataFrame(data.groupby(['Session', 'sub_session'])['timestamp'].count())
         temp_df.reset_index(inplace = True)
         temp_df.columns = ['Session', 'sub_session', 'len']
@@ -125,6 +140,7 @@ def clean_data(data, config):
         data.reset_index(inplace = True, drop = True)
 
     if 'rm_small_users' in config.clean_mode:
+        # Remove users with small number of sessions
         temp_df = pd.DataFrame(data.groupby('user_id')['Session'].nunique())
         temp_df.reset_index(inplace = True)
         temp_df.columns = ['user_id', 'len']
@@ -145,7 +161,7 @@ def clean_data(data, config):
 
 def cut_sessions(data, config):
     """
-    This function devides each session whose length is greater than config.max_session_len to sub_sessions whose length equals to max_session_len.
+    This function divides each session whose length is greater than config.max_session_len to sub_sessions whose length equals to max_session_len.
     """
     data['sub_session'] = ''
     temp_df = pd.DataFrame(data.Session.value_counts())
@@ -211,6 +227,109 @@ def create_session(data, config):
     assert len(new_data) == len(data)
     return new_data
 
+def prepare_train_data(data, config):
+    # data contains user_id, timestamp, artist_name, track_name, session, sub_session
+    if config.dump_vocab:
+        file_path = config.vocab_dir
+        with open(file_path, 'rb') as f:
+            vocab = pickle.load(f)
+        print('Vocabulary loaded')
+    else:
+        vocab = get_vocab(data, config)
+    data['idx'] = data.apply(lambda row: vocab.item2idx[(row['artist_name'], row['track_name'])], axis = 1)
+    print('Index Assigned')
+    df = Data_handler(config, data = data)
+    df.sessions = df.get_val_list('Session')
+    new_df = pd.DataFrame(columns = ['input', 'output', 'in_len', 'user_id'])
+    for i, session in enumerate(df.sessions):
+        data = df.data[df.data.Session == session]
+        sess_df = Data_handler(config, data = data)
+        sess_df.sub_sessions = sess_df.get_val_list('sub_session')
+        if i%10 == 0 :
+            print(f'Session: {session} for user: {sess_df.users[0]} is under process')
+        for sub in sess_df.sub_sessions:
+            temp_df = pd.DataFrame()
+            temp_sub = sess_df.data[sess_df.data['sub_session'] == sub]
+            In = []
+            In_len = []
+            Out = []
+            for i_len in range(config.min_in_sess_len, len(temp_sub)):
+                In_len.append(i_len)
+                i = list(temp_sub[:i_len].idx)
+                o = list(temp_sub[i_len:].idx)
+                i = [str(x) for x in i]
+                i = ','.join(i)
+                o = [str(x) for x in o]
+                o = ','.join(o)
+                In.append(i)
+                Out.append(o)
+            temp_df['input'] = In
+            temp_df['output'] = Out
+            temp_df['in_len'] = In_len
+            assert len(sess_df.users) > 0
+            temp_df['user_id'] = sess_df.users[0]
+            new_df = pd.concat([new_df, temp_df])
+    new_df = new_df[['user_id', 'in_len', 'input', 'output']]
+    return new_df
+
+
+
+
+def get_vocab(data, config):
+    """
+    Creates and outputs a Vocabulary object for the current data
+    """
+    # data contains user_id, timestamp, artist_name, track_name, session, sub_session
+    vocab = Vocab(data,config)
+    if config.dump_vocab:
+        file_path = config.vocab_dir
+        with open(file_path, 'wb') as f:
+            pickle.dump(vocab, f)
+    else:
+        return vocab
+
+def train_valid_test_split(data, config):
+    """
+    Splits train, validation, and test datasets. Also, removes items from test and val set that have not seen in the training set
+    """
+    # data contains user_id, timestamp, artist_name, track_name, session, sub_session
+    df = Data_handler(config, data = data)
+    train_idx = 0
+    val_idx = 0
+    train_session = []
+    val_session = []
+    test_session = []
+    for user in df.users:
+        data = df.data[df.data.user_id == user]
+        user_df = Data_handler(config, data = data)
+        user_df.sessions = user_df.get_val_list('Session')
+        if len(user_df.sessions) <= 20:
+            train_idx = len(user_df.sessions) - 2
+            val_idx = train_idx + 1
+        else:
+            train_idx = int(len(user_df.sessions) * 0.9)
+            val_idx = train_idx + int(len(user_df.sessions) * 0.05)
+        train_session.extend(user_df.sessions[:train_idx])
+        val_session.extend(user_df.sessions[train_idx:val_idx])
+        test_session.extend(user_df.sessions[val_idx:])
+        types = {'train': train_session, 'val' : val_session, 'test': test_session}
+    output = {}
+    for task in types.keys():
+        temp = pd.DataFrame()
+        temp['Session'] = types[task]
+        output[task] = pd.DataFrame(pd.merge(df.data, temp, how = 'inner', on = ["Session"]))
+    train = output['train']
+    seen_items = pd.DataFrame(train[['artist_name', 'track_name']])
+    seen_items.drop_duplicates(subset = ['artist_name', 'track_name'], inplace = True, ignore_index = True)
+    for key in output.keys():
+        output[key] = pd.merge(output[key], seen_items, how = 'inner', on = ['artist_name', 'track_name'])
+    return output
+    
+def save_data(data, config):
+    """
+    The input data has all the attributes: user_id, timestamp, session, sub_session, lyrics
+    """
+    # Keep only user_id, timestamp, artist_name, track_name, session, sub_session
 
 
 
@@ -236,3 +355,5 @@ if __name__ == '__main__':
     df.data = cut_sessions(df.data, config)
     config.clean_mode = ['rm_small_sub_session']
     df.data = clean_data(df.data, config)
+    get_vocab(df.data, config)
+    new_df = prepare_train_data(df.data, config)
