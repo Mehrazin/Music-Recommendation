@@ -9,6 +9,17 @@ import numpy as np
 from dataloader import Vocab
 import pickle
 import os
+import time
+from multiprocessing import  Pool
+import multiprocessing as mp
+from lyricsgenius import Genius
+import argparse
+
+def arg_parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--test_mode', type=bool,
+                        default=False)
+    return parser.parse_args()
 
 def load_data(config):
     """
@@ -97,6 +108,7 @@ class Data_handler():
                 new_len = int(float(fracs[i]*len(temp_df)))
                 temp_df = temp_df[:new_len]
                 sub_data = pd.concat([sub_data, temp_df])
+            sub_data.reset_index(inplace = True, drop = True)
         return sub_data
 
 
@@ -324,7 +336,7 @@ def train_valid_test_split(data, config):
     for key in output.keys():
         output[key] = pd.merge(output[key], seen_items, how = 'inner', on = ['artist_name', 'track_name'])
     return output
-    
+
 def save_data(data, config):
     """
     The input data has all the attributes: user_id, timestamp, session, sub_session, lyrics
@@ -332,28 +344,88 @@ def save_data(data, config):
     # Keep only user_id, timestamp, artist_name, track_name, session, sub_session
 
 
+# Lyrics part
+class song_not_found(Exception):
+    pass
 
+def init_genius(token):
+    # get the genius instanse
+    genius = Genius(token)
+    # Turn off status messages
+    genius.verbose = False
+    # Remove section headers (e.g. [Chorus]) from lyrics when searching
+    genius.remove_section_headers = True
+    # Include hits thought to be non-songs (e.g. track lists)
+    genius.skip_non_songs = False
+    # Exclude songs with these words in their title
+    genius.excluded_terms = ["(Remix)", "(Live)"]
+    return genius
 
+def create_subdf(df, start, stop, drop_labels):
+    sub_df = df[start:stop].copy()
+    sub_df.drop(labels = drop_labels, axis = 1, inplace = True)
+    return sub_df
 
+def fetch_lyrics(artist_name, track_name, genius):
+    try:
+        song = genius.search_song(title=track_name, artist=artist_name, get_full_info=True)
+        if not song :
+            return np.nan
+        lyrics = song.lyrics
+        lyrics = lyrics.lower()
+        if lyrics.islower():
+            return song.lyrics
+        else:
+            return np.nan
+    except :
+        return np.nan
+def add_lyrics(df):
+    token = 'K_biyrE1lISJN24FOY3d1oQBP34PA0rYo4WTxyPriLSNvfH49v7QFHOu3BM2Q0RU'
+    genius = init_genius(token)
+    df['lyrics'] = df.apply(lambda row : fetch_lyrics(row['artist_name'], row['track_name'], genius), axis = 1)
+    return df
 
+def parallelize_dataframe(df, func, n_cores):
+    df_split = np.array_split(df, n_cores)
+    pool = Pool(n_cores)
+    df = pd.concat(pool.map(func, df_split))
+    pool.close()
+    pool.join()
+    return df
 
-
-
-
-
-
-
-
-
-
+def lyrics(data, config):
+    tracks = pd.DataFrame(data[['artist_name','track_name']])
+    tracks.drop_duplicates(['artist_name','track_name'], inplace = True)
+    tracks.reset_index(inplace = True, drop = True)
+    final_df = pd.DataFrame(columns = ['artist_name', 'track_name', 'lyrics'])
+    num_itr = int(len(tracks)/1000) + 1
+    for i in tqdm(range(num_itr)):
+        sub_tracks = create_subdf(tracks, i*1000, (i+1)*1000, [])
+        tic = time.perf_counter()
+        sub_tracks = parallelize_dataframe(sub_tracks, add_lyrics, n_cores = mp.cpu_count())
+        toc = time.perf_counter()
+        print(f'Performance: {toc - tic:0.8f} seconds')
+        final_df = pd.concat([final_df, sub_tracks])
+        final_df.to_csv(config.data_w_lyrics_dir, index = False)
+        del sub_tracks
+        final_df = pd.read_csv(config.data_w_lyrics_dir)
+    final_df = pd.read_csv(config.data_w_lyrics_dir)
+    final_df = final_df.dropna(inplace = True)
+    final_df['lyrics'] = final_df['lyrics'].apply(lambda x: x.replace("\n", " "))
+    final_df.to_csv(config.processed_data_w_lyrics_dir, index = False)
 
 if __name__ == '__main__':
-    config = Config()
+    arg = arg_parse()
+    config = Config(arg)
     df = Data_handler(config)
-    df.data = create_session(df.data, config)
-    df.data = clean_data(df.data, config)
-    df.data = cut_sessions(df.data, config)
-    config.clean_mode = ['rm_small_sub_session']
-    df.data = clean_data(df.data, config)
-    get_vocab(df.data, config)
-    new_df = prepare_train_data(df.data, config)
+    lyrics(df.data, config)
+    path = os.path.join(config.exp_dir, 'config.pkl')
+    with open(path, 'wb') as f:
+        pickle.dump(config, f)
+    # df.data = create_session(df.data, config)
+    # df.data = clean_data(df.data, config)
+    # df.data = cut_sessions(df.data, config)
+    # config.clean_mode = ['rm_small_sub_session']
+    # df.data = clean_data(df.data, config)
+    # get_vocab(df.data, config)
+    # new_df = prepare_train_data(df.data, config)
