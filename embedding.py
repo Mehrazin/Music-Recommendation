@@ -39,9 +39,9 @@ def get_artist_vectors(df, vectors, artist_names):
 
 
 class TFIDFEmbedding:
-    def __init__(self, base_path, vector_size=500):
-        self.base_path = base_path
-        df = pd.read_csv(os.path.join(base_path, 'df_lyrics.csv'))
+    def __init__(self, data, config):
+        self.base_path = config.exp_dir
+        df = data
         df = df.dropna(axis=0, how='any')
         df['lyrics'] = df['lyrics'].apply(lambda x: x.replace("\n", " "))
         self.df = df
@@ -50,8 +50,8 @@ class TFIDFEmbedding:
             with open(os.path.join(base_path, 'tfidf_vectors.pkl'), 'rb') as f:
                 self.tfidf_vectors = pickle.load(f)
         else:
-            self.tfidf_vectors = self.tfidf(min_df=5, max_features=vector_size)
-            with open(os.path.join(base_path, 'tfidf_vectors.pkl'), 'wb') as f:
+            self.tfidf_vectors = self.tfidf(min_df=5, max_features=config.tfidf_vector_size)
+            with open(os.path.join(self.base_path, 'tfidf_vectors.pkl'), 'wb') as f:
                 pickle.dump(self.tfidf_vectors, f)
 
         self.merge_save()
@@ -73,9 +73,9 @@ class TFIDFEmbedding:
 
 
 class Doc2VecEmbedding:
-    def __init__(self, base_path, vector_size=100, epochs=50):
-        self.base_path = base_path
-        df = pd.read_csv(os.path.join(base_path, 'df_lyrics.csv'))
+    def __init__(self, data, config):
+        self.base_path = config.exp_dir
+        df = data
         df = df.dropna(axis=0, how='any')
         df['lyrics'] = df['lyrics'].apply(lambda x: x.replace("\n", " "))
         self.df = df
@@ -85,9 +85,9 @@ class Doc2VecEmbedding:
                 self.doc2vec_vectors = pickle.load(f)
         else:
             self.tagged_docs = self.tag_documents()
-            self.model = self.doc2vec_train(vector_size=vector_size, epochs=epochs)
+            self.model = self.doc2vec_train(vector_size = config.doc2vec_vector_size, epochs = config.doc2vec_epoochs)
             self.doc2vec_vectors = self.infer()
-            with open(os.path.join(base_path, 'doc2vec_vectors.pkl'), 'wb') as f:
+            with open(os.path.join(self.base_path, 'doc2vec_vectors.pkl'), 'wb') as f:
                 pickle.dump(self.doc2vec_vectors, f)
 
         self.merge_save()
@@ -138,7 +138,7 @@ class Doc2VecEmbedding:
             vectors = np.stack([self.model.infer_vector(tagged_doc.words) for tagged_doc in tqdm(self.tagged_docs)],
                                axis=0)
             if save:
-                with open(os.path.join('/content/drive/MyDrive/dataset/', file_name + '.pkl'), 'wb') as f:
+                with open(os.path.join(self.base_path, file_name + '.pkl'), 'wb') as f:
                     pickle.dump(vectors, f)
         return vectors
 
