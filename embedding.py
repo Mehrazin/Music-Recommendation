@@ -13,6 +13,7 @@ from nltk.corpus import stopwords
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 
 nltk.download('stopwords')
+nltk.download('punkt')
 stop_words = set(stopwords.words('english'))
 
 
@@ -42,8 +43,8 @@ class TFIDFEmbedding:
     def __init__(self, data, config):
         self.base_path = config.exp_dir
         df = data
-        df = df.dropna(axis=0, how='any')
-        df['lyrics'] = df['lyrics'].apply(lambda x: x.replace("\n", " "))
+        # df = df.dropna(axis=0, how='any')
+        # df['lyrics'] = df['lyrics'].apply(lambda x: x.replace("\n", " "))
         self.df = df
 
         if os.path.exists(os.path.join(base_path, 'tfidf_vectors.pkl')):
@@ -76,11 +77,11 @@ class Doc2VecEmbedding:
     def __init__(self, data, config):
         self.base_path = config.exp_dir
         df = data
-        df = df.dropna(axis=0, how='any')
-        df['lyrics'] = df['lyrics'].apply(lambda x: x.replace("\n", " "))
+        # df = df.dropna(axis=0, how='any')
+        # df['lyrics'] = df['lyrics'].apply(lambda x: x.replace("\n", " "))
         self.df = df
 
-        if os.path.exists(os.path.join(base_path, 'doc2vec_vectors.pkl')):
+        if os.path.exists(os.path.join(self.base_path, 'doc2vec_vectors.pkl')):
             with open(os.path.join(base_path, 'doc2vec_vectors.pkl'), 'rb') as f:
                 self.doc2vec_vectors = pickle.load(f)
         else:

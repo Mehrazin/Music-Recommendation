@@ -2,7 +2,7 @@
 This module contains files for preproccesing the data and defining sessions and also train-test split
 
 """
-from utils import Config
+from utils import Config, bool_flag
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -15,10 +15,11 @@ import multiprocessing as mp
 from lyricsgenius import Genius
 import argparse
 
+
+
 def arg_parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--test_mode', type=bool,
-                        default=False)
+    parser.add_argument('--test_mode', type=bool_flag, default=False)
     return parser.parse_args()
 
 def load_data(config):
@@ -76,16 +77,18 @@ class Data_handler():
             self.data = kwargs['data']
         else:
             self.data = load_data(config)
-        self.users = []
-        self.artists = []
-        self.tracks = []
-        self.sessions = []
+        if 'pass_col' in kwargs.keys():
+            self.pass_col = kwargs['pass_col']
+        self.info = {}
         self.update()
 
     def update(self):
-        self.users = self.get_val_list('user_id')
-        self.artists = self.get_val_list('artist_name')
-        self.tracks = self.get_val_list('track_name')
+        for col in list(self.data.columns):
+            if col in self.pass_col:
+                pass
+            else:
+                self.info[col] = self.get_val_list(col)
+
 
 
     def get_val_list(self, col_name):
@@ -417,11 +420,13 @@ def lyrics(data, config):
 if __name__ == '__main__':
     arg = arg_parse()
     config = Config(arg)
-    df = Data_handler(config)
-    lyrics(df.data, config)
     path = os.path.join(config.exp_dir, 'config.pkl')
-    with open(path, 'wb') as f:
-        pickle.dump(config, f)
+    print(arg.test_mode)
+    print(config.test_mode)
+    # df = Data_handler(config)
+    # lyrics(df.data, config)
+    # with open(path, 'wb') as f:
+    #     pickle.dump(config, f)
     # df.data = create_session(df.data, config)
     # df.data = clean_data(df.data, config)
     # df.data = cut_sessions(df.data, config)

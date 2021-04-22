@@ -3,7 +3,21 @@ This file contains class and modules for configuration and setup.
 
 """
 import os
+import argparse
 # import fasttext
+FALSY_STRINGS = {'off', 'false', '0'}
+TRUTHY_STRINGS = {'on', 'true', '1'}
+
+def bool_flag(s):
+    """
+    Parse boolean arguments from the command line.
+    """
+    if s.lower() in FALSY_STRINGS:
+        return False
+    elif s.lower() in TRUTHY_STRINGS:
+        return True
+    else:
+        raise argparse.ArgumentTypeError("Invalid value for a boolean flag!")
 
 class Config:
     def __init__(self, arg):
@@ -13,7 +27,7 @@ class Config:
         self.Original_user_track_dir = os.path.join(self.Original_lastfm_dir, 'userid-timestamp-artid-artname-traid-traname.tsv')
         self.Original_user_profile_dir = os.path.join(self.Original_lastfm_dir, 'userid-profile.tsv')
         self.Processed_dataset_dir = os.path.join(self.Dataset_dir, 'Final_df_w_sessions.csv')
-        self.Test_dataset_dir = os.path.join(self.Dataset_dir, 'Test_sample_2.csv')
+        self.Test_dataset_dir = os.path.join(self.Dataset_dir, 'df_lyrics.csv')
         # Experiment path
         self.dump_path = os.path.join(os.getcwd(), 'Dumped')
         if not os.path.exists(self.dump_path):
