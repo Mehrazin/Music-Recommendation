@@ -11,6 +11,8 @@ from sklearn.manifold import TSNE
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+import multiprocessing
+from joblib import Parallel, delayed
 
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -100,9 +102,17 @@ class Doc2VecEmbedding:
             with open(path, 'rb') as f:
                 tagged_docs = pickle.load(f)
         else:
-            tagged_docs = [TaggedDocument(
-                words=[w for w in word_tokenize(doc.lower()) if w not in stop_words],
-                tags=[str(i)]) for i, doc in tqdm(enumerate(self.df.lyrics), total=len(self.df))]
+            # tagged_docs = [TaggedDocument(
+            #     words=[w for w in word_tokenize(doc.lower()) if w not in stop_words],
+            #     tags=[str(i)]) for i, doc in tqdm(enumerate(self.df.lyrics), total=len(self.df))]
+            num_cores = multiprocessing.cpu_count()
+            def my_function(i, doc):
+                return TaggedDocument(
+                    words=[w for w in word_tokenize(doc.lower()) if w not in stop_words],
+                    tags=[str(i)])
+            inputs = tqdm(enumerate(self.df.lyrics), total=len(self.df))
+            tagged_docs = Parallel(n_jobs=num_cores)(delayed(my_function)(i,doc)
+                                                        for i, doc in inputs)
             if save:
                 with open(path, 'wb') as f:
                     pickle.dump(tagged_docs, f)
@@ -117,12 +127,14 @@ class Doc2VecEmbedding:
         if os.path.exists(path):
             model = Doc2Vec.load(path)
         else:
+            cores = multiprocessing.cpu_count()
             model = Doc2Vec(vector_size=vector_size,
                             epochs=epochs,
                             alpha=alpha,
                             min_alpha=min_alpha,
                             min_count=min_count,
-                            dm=1)
+                            dm=1,
+                            workers=cores)
             model.build_vocab(self.tagged_docs)
             model.train(self.tagged_docs, total_examples=model.corpus_count, epochs=model.epochs)
             if save:
@@ -136,6 +148,15 @@ class Doc2VecEmbedding:
             with open(path, 'rb') as f:
                 vectors = pickle.load(f)
         else:
+            # num_cores = multiprocessing.cpu_count()
+            #
+            # def my_function(tagged_doc):
+            #     return self.model.infer_vector(tagged_doc.words)
+            #
+            # inputs = tqdm(self.tagged_docs)
+            # vectors = Parallel(n_jobs=num_cores)(delayed(my_function)(doc)
+            #                                             for doc in inputs)
+            # vectors = np.stack(vectors, axis = 0)
             vectors = np.stack([self.model.infer_vector(tagged_doc.words) for tagged_doc in tqdm(self.tagged_docs)],
                                axis=0)
             if save:
