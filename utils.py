@@ -83,6 +83,7 @@ class Config:
         # Training configurations
         self.batch_size = 4
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.emb_freeze = True
         self.save()
 
 

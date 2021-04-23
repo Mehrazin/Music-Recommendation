@@ -24,7 +24,7 @@ def create_embeding(config):
         else:
             emb_matrix[i] = vocab.idx2emb[i]
     weights = torch.from_numpy(emb_matrix)
-    embedding = nn.Embedding.from_pretrained(weights, padding_idx = 0)
+    embedding = nn.Embedding.from_pretrained(weights, padding_idx = 0, freeze=config.emb_freeze)
     return embedding, emb_dim
 
 class EncoderRNN(nn.Module):
@@ -35,11 +35,16 @@ class EncoderRNN(nn.Module):
         self.hidden_size = emb_dim
         self.gru = nn.GRU(self.hidden_size, self.hidden_size)
 
-    def forward(self, input, hidden):
-        embedded = self.embedding(input).view(1, 1, -1)
-        output = embedded
-        output, hidden = self.gru(output, hidden)
+    def forward(self, input):
+        # input shape: (seq_len, N)
+        embedded = self.embedding(input)
+        # embedded shape: (seq_len, N, emb_len)
+        output, hidden = self.gru(embedded)
         return output, hidden
 
-    def initHidden(self):
-        return torch.zeros(1, 1, self.hidden_size, device=device)
+
+class Decoder(nn.Module):
+    pass
+
+class Seq2Seq(nn.Module):
+    pass
