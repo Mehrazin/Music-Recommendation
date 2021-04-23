@@ -4,6 +4,7 @@ This file contains class and modules for configuration and setup.
 """
 import os
 import argparse
+import pickle
 # import fasttext
 FALSY_STRINGS = {'off', 'false', '0'}
 TRUTHY_STRINGS = {'on', 'true', '1'}
@@ -27,7 +28,11 @@ class Config:
         self.Original_user_track_dir = os.path.join(self.Original_lastfm_dir, 'userid-timestamp-artid-artname-traid-traname.tsv')
         self.Original_user_profile_dir = os.path.join(self.Original_lastfm_dir, 'userid-profile.tsv')
         self.Processed_dataset_dir = os.path.join(self.Dataset_dir, 'Final_df_w_sessions.csv')
-        self.Test_dataset_dir = os.path.join(self.Dataset_dir, 'df_lyrics.csv')
+        self.Test_dir = os.path.join(self.Dataset_dir, 'Test', '1k-item', 'Datasets')
+        assert os.path.exists(self.Test_dir)
+        if arg.test_mode:
+            self.Dataset_dir = self.Test_dir
+        # self.Test_dataset_dir = os.path.join(self.Test_dir, 'df_lyrics.csv')
         # Experiment path
         self.dump_path = os.path.join(os.getcwd(), 'Dumped')
         if not os.path.exists(self.dump_path):
@@ -37,7 +42,7 @@ class Config:
         if not os.path.exists(self.exp_dir):
             os.mkdir(self.exp_dir)
         # Final files Path
-        self.vocab_dir = os.path.join(self.exp_dir, 'vocab.pkl')
+        self.vocab_dir = os.path.join(self.Dataset_dir, 'vocab.pkl')
         self.data_w_lyrics_dir = os.path.join(self.exp_dir, 'added_lyrics.csv')
         self.processed_data_w_lyrics_dir = os.path.join(self.exp_dir, 'processed_lyrics.csv')
         # Data preprocessing configurations
@@ -62,10 +67,14 @@ class Config:
         # Vocabulary configurations
         self.gen_user_idx = True
         self.gen_item_idx = True
+        self.gen_item_emb = True
+        self.gen_emb_idx = True
+        self.save_vocab = True
         # Embedding configurations
         self.tfidf_vector_size = 500
         self.doc2vec_vector_size = 500
         self.doc2vec_epoochs = 50
+        self.save()
 
     def get_exp_id(self):
         """
@@ -78,6 +87,10 @@ class Config:
             dir_list = [int(dir) for dir in dir_list]
             id = max(dir_list) + 1
         return id
+    def save(self):
+        path = os.path.join(self.exp_dir, 'config.pkl')
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
 
 # class LanguageIdentification:
 #
