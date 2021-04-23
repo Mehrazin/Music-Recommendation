@@ -5,6 +5,7 @@ This file contains class and modules for configuration and setup.
 import os
 import argparse
 import pickle
+import torch
 # import fasttext
 FALSY_STRINGS = {'off', 'false', '0'}
 TRUTHY_STRINGS = {'on', 'true', '1'}
@@ -32,6 +33,11 @@ class Config:
         assert os.path.exists(self.Test_dir)
         if arg.test_mode:
             self.Dataset_dir = self.Test_dir
+
+        self.train_dir = os.path.join(self.Dataset_dir, 'train_clean.csv')
+        self.test_dir = os.path.join(self.Dataset_dir, 'test_clean.csv')
+        self.valid_dir = os.path.join(self.Dataset_dir, 'val_clean.csv')
+
         # self.Test_dataset_dir = os.path.join(self.Test_dir, 'df_lyrics.csv')
         # Experiment path
         self.dump_path = os.path.join(os.getcwd(), 'Dumped')
@@ -74,7 +80,12 @@ class Config:
         self.tfidf_vector_size = 500
         self.doc2vec_vector_size = 500
         self.doc2vec_epoochs = 50
+        # Training configurations
+        self.batch_size = 4
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.save()
+
+
 
     def get_exp_id(self):
         """

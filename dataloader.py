@@ -3,6 +3,10 @@ import pandas as pd
 import pickle
 import os
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
 class Vocab:
     def __init__(self, config):
@@ -81,3 +85,90 @@ class Vocab:
         path = os.path.join(config.exp_dir, 'vocab.pkl')
         with open(path, 'wb') as f:
             pickle.dump(self, f)
+
+
+class Music_data(Dataset):
+    def __init__(self, config, dtype):
+        super(Music_data, self).__init__()
+        self.data = []
+        self.dtype = dtype
+        self.pad_index = config.pad_index
+        self.sos_index = config.sos_index
+        if dtype == 'train':
+            self.path = config.train_dir
+        if dtype == 'valid':
+            self.path = config.valid_dir
+        if dtype == 'test':
+            self.path = config.test_dir
+        assert os.path.exists(self.path)
+
+        vocab_path = os.path.join(config.Dataset_dir, 'vocab.pkl')
+        assert os.path.exists(vocab_path)
+        with open(vocab_path, 'rb') as f:
+            vocab = pickle.load(f)
+        self.vocab = vocab
+        self.load_data(config)
+
+    def load_data(self, config):
+        """
+        Loads the data from the disk and put to self.data
+        """
+        data = pd.read_csv(self.path)
+        def str_to_int(st):
+            st = st.rstrip().split(',')
+            l = [int(t) for t in st]
+            return l
+        df = [(row['user_id'], str_to_int(row['input']), str_to_int(row['output'])) for _,row in data.iterrows()]
+        self.data = df
+        self.size = len(self.data)
+
+    def __len__(self):
+        """
+        Retuens the size of the dataset
+        """
+        return self.size
+
+    def __getitem__(self, idx):
+        """
+        Returns an item in index = idx from the dataset
+        """
+        return self.data[idx]
+
+    def create_batch(self, sequences):
+        """
+        Creates a batch from the given list of equations.
+        """
+        lengths = torch.LongTensor([len(s) + 2 for s in sequences])
+        sent = torch.LongTensor(lengths.max().item(), lengths.size(0)).fill_(self.pad_index)
+        assert lengths.min().item() > 2
+        sent[0] = self.sos_index
+        for i, s in enumerate(sequences):
+            sent[1:lengths[i] - 1, i].copy_(s)
+            sent[lengths[i] - 1, i] = self.sos_index
+        return sent, lengths
+
+    def collate_fn(self, elements):
+        """
+        Collate samples into a batch.
+        """
+        u, i, o = zip(*elements)
+        u = [torch.LongTensor([self.vocab.user2idx[user]]) for user in u]
+        i = [torch.LongTensor([token for token in seq]) for seq in i]
+        o = [torch.LongTensor([token for token in seq]) for seq in o]
+        i, in_len = self.create_batch(i)
+        o, out_len = self.create_batch(o)
+        return u, (i, in_len), (o, out_len)
+
+def create_data_loader(config, dtype, shuffle = False):
+    """
+    Returns an iterable to iterate over the data. dtype can be one of the followings:
+    'train', 'valid', 'test'
+    """
+    assert dtype in ['train', 'valid', 'test']
+    dataset = Music_data(config, dtype)
+    return DataLoader(
+        dataset,
+        batch_size=config.batch_size,
+        shuffle=shuffle,
+        collate_fn=dataset.collate_fn
+    )
