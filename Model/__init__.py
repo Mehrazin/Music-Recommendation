@@ -1,1 +1,1 @@
-from gru_attention import *
+from .gru_attention import *
