@@ -79,6 +79,8 @@ class Data_handler():
             self.data = load_data(config)
         if 'pass_col' in kwargs.keys():
             self.pass_col = kwargs['pass_col']
+        else :
+            self.pass_col = []
         self.info = {}
         self.update()
 
@@ -254,15 +256,18 @@ def prepare_train_data(data, config):
     data['idx'] = data.apply(lambda row: vocab.item2idx[(row['artist_name'], row['track_name'])], axis = 1)
     print('Index Assigned')
     df = Data_handler(config, data = data)
-    df.sessions = df.get_val_list('Session')
+    # df.sessions = df.get_val_list('Session')
     new_df = pd.DataFrame(columns = ['input', 'output', 'in_len', 'user_id'])
-    for i, session in enumerate(df.sessions):
+    # for i, session in enumerate(df.sessions):
+    for i, session in enumerate(df.info['Session']):
         data = df.data[df.data.Session == session]
         sess_df = Data_handler(config, data = data)
-        sess_df.sub_sessions = sess_df.get_val_list('sub_session')
+        # sess_df.sub_sessions = sess_df.get_val_list('sub_session')
         if i%10 == 0 :
-            print(f'Session: {session} for user: {sess_df.users[0]} is under process')
-        for sub in sess_df.sub_sessions:
+            # print(f'Session: {session} for user: {sess_df.users[0]} is under process')
+            print(f'Session: {session} for user: {sess_df.info["user_id"][0]} is under process')
+        # for sub in sess_df.sub_sessions:
+        for sub in sess_df.info['sub_session']:
             temp_df = pd.DataFrame()
             temp_sub = sess_df.data[sess_df.data['sub_session'] == sub]
             In = []
@@ -281,8 +286,8 @@ def prepare_train_data(data, config):
             temp_df['input'] = In
             temp_df['output'] = Out
             temp_df['in_len'] = In_len
-            assert len(sess_df.users) > 0
-            temp_df['user_id'] = sess_df.users[0]
+            assert len(sess_df.info['user_id']) > 0
+            temp_df['user_id'] = sess_df.info['user_id'][0]
             new_df = pd.concat([new_df, temp_df])
     new_df = new_df[['user_id', 'in_len', 'input', 'output']]
     return new_df
@@ -314,19 +319,19 @@ def train_valid_test_split(data, config):
     train_session = []
     val_session = []
     test_session = []
-    for user in df.users:
+    for user in df.info['user_id']:
         data = df.data[df.data.user_id == user]
         user_df = Data_handler(config, data = data)
-        user_df.sessions = user_df.get_val_list('Session')
-        if len(user_df.sessions) <= 20:
-            train_idx = len(user_df.sessions) - 2
+        # user_df.sessions = user_df.get_val_list('Session')
+        if len(user_df.info['Session']) <= 20:
+            train_idx = len(user_df.info['Session']) - 2
             val_idx = train_idx + 1
         else:
-            train_idx = int(len(user_df.sessions) * 0.9)
-            val_idx = train_idx + int(len(user_df.sessions) * 0.05)
-        train_session.extend(user_df.sessions[:train_idx])
-        val_session.extend(user_df.sessions[train_idx:val_idx])
-        test_session.extend(user_df.sessions[val_idx:])
+            train_idx = int(len(user_df.info['Session']) * 0.9)
+            val_idx = train_idx + int(len(user_df.info['Session']) * 0.05)
+        train_session.extend(user_df.info['Session'][:train_idx])
+        val_session.extend(user_df.info['Session'][train_idx:val_idx])
+        test_session.extend(user_df.info['Session'][val_idx:])
         types = {'train': train_session, 'val' : val_session, 'test': test_session}
     output = {}
     for task in types.keys():
@@ -337,14 +342,34 @@ def train_valid_test_split(data, config):
     seen_items = pd.DataFrame(train[['artist_name', 'track_name']])
     seen_items.drop_duplicates(subset = ['artist_name', 'track_name'], inplace = True, ignore_index = True)
     for key in output.keys():
-        output[key] = pd.merge(output[key], seen_items, how = 'inner', on = ['artist_name', 'track_name'])
+        temp = pd.merge(output[key], seen_items, how = 'inner', on = ['artist_name', 'track_name'])
+        temp.sort_values(['user_id', 'timestamp'], ascending=True, inplace=True)
+        temp.reset_index(inplace = True, drop = True)
+        output[key] = temp
     return output
 
-def save_data(data, config):
+def save_data(config):
     """
     The input data has all the attributes: user_id, timestamp, session, sub_session, lyrics
     """
     # Keep only user_id, timestamp, artist_name, track_name, session, sub_session
+    path = os.path.join(config.Dataset_dir, 'Dataset.csv')
+    data = pd.read_csv(path)
+    output = train_valid_test_split(data, config)
+    print('Train-test split was done')
+    processed_output = {}
+    for task in (output.keys()):
+        processed_output[task] = prepare_train_data(output[task], config)
+    print('Data prepared to be saved')
+    for task in (output.keys()):
+        name_raw = task + '_raw.csv'
+        path_raw = os.path.join(config.exp_dir, name_raw)
+        name_clean = task + '_clean.csv'
+        path_clean = os.path.join(config.exp_dir, name_clean)
+        output[task].to_csv(path_raw, index = False)
+        processed_output[task].to_csv(path_clean, index = False)
+    print('Dataset saved')
+
 
 
 # Lyrics part
@@ -416,6 +441,32 @@ def lyrics(data, config):
     final_df = final_df.dropna(inplace = True)
     final_df['lyrics'] = final_df['lyrics'].apply(lambda x: x.replace("\n", " "))
     final_df.to_csv(config.processed_data_w_lyrics_dir, index = False)
+
+def merge_val_item (config):
+    """
+    Based on the items that we have embeddings for, builds necessary datasets
+    """
+    config.test_mode = False
+    raw_df = Data_handler(config)
+    path = os.path.join(config.Test_dir, 'df_doc2vec.csv')
+    items = pd.read_csv(path)
+    items.drop(columns = ['Unnamed: 0'], inplace = True)
+    items.drop(columns = ['embedding'], inplace = True)
+    new_df = pd.merge(raw_df.data, items, how = 'inner', on = ['artist_name', 'track_name'])
+    users = pd.DataFrame(new_df[['user_id']])
+    users.drop_duplicates(subset = ['user_id'], inplace = True, ignore_index = True)
+    path = os.path.join(config.exp_dir, 'items.csv')
+    items.to_csv(path, index = False)
+    path = os.path.join(config.exp_dir, 'users.csv')
+    users.to_csv(path, index = False)
+    config.clean_mode = ['rm_small_sess', 'rm_small_users']
+    assert config.clean_mode == ['rm_small_sess', 'rm_small_users']
+    new_df = clean_data(new_df, config)
+    config.clean_mode = ['rm_small_sub_session']
+    new_df = clean_data(new_df, config)
+    new_df.sort_values(['user_id', 'timestamp'], ascending=True, inplace=True)
+    path = os.path.join(config.exp_dir, 'Dataset.csv')
+    new_df.to_csv(path, index = False)
 
 if __name__ == '__main__':
     arg = arg_parse()
