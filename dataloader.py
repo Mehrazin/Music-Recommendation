@@ -152,7 +152,7 @@ class Music_data(Dataset):
         Collate samples into a batch.
         """
         u, i, o = zip(*elements)
-        u = [torch.LongTensor([self.vocab.user2idx[user]]) for user in u]
+        u = torch.LongTensor([self.vocab.user2idx[user] for user in u])
         i = [torch.LongTensor([token for token in seq]) for seq in i]
         o = [torch.LongTensor([token for token in seq]) for seq in o]
         i, in_len = self.create_batch(i)

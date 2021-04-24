@@ -43,10 +43,16 @@ class Config:
         self.dump_path = os.path.join(os.getcwd(), 'Dumped')
         if not os.path.exists(self.dump_path):
             os.mkdir(self.dump_path)
-        self.exp_id = self.get_exp_id()
+        if arg.exp_id == 0 :
+            self.exp_id = self.get_exp_id()
+        else :
+            self.exp_id = arg.exp_id
         self.exp_dir = os.path.join(self.dump_path, str(self.exp_id))
         if not os.path.exists(self.exp_dir):
             os.mkdir(self.exp_dir)
+        self.checkpoint_dir = os.path.join(self.exp_dir, 'checkpoints')
+        if not os.path.exists(self.checkpoint_dir):
+            os.mkdir(self.checkpoint_dir)
         # Final files Path
         self.vocab_dir = os.path.join(self.Dataset_dir, 'vocab.pkl')
         self.data_w_lyrics_dir = os.path.join(self.exp_dir, 'added_lyrics.csv')
@@ -76,17 +82,42 @@ class Config:
         self.gen_item_emb = True
         self.gen_emb_idx = True
         self.save_vocab = True
+        if arg.load_vocab :
+            self.load_vocab()
         # Embedding configurations
         self.tfidf_vector_size = 500
         self.doc2vec_vector_size = 500
         self.doc2vec_epoochs = 50
         # Training configurations
-        self.batch_size = 4
+        self.load_model = arg.load_model
+        if self.load_model:
+            self.reload_path = os.path.join(self.checkpoint_dir, 'model_checkpoint.pth.tar')
+            assert os.path.exists(self.reload_path)
+        self.train = True
+        self.eval_only = False
+        self.save_periodic = True
+        self.save_every = arg.save_every
+        self.seed = 10
+        self.num_epochs = arg.num_epochs
+        self.learning_rate = 0.001
+        self.batch_size = arg.batch_size
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.emb_freeze = True
+        self.teacher_force_ratio = 0.5
+        self.grad_clip = True
+        self.print_every = 10
         self.save()
 
 
+    def load_vocab(self):
+        """
+        Adds the vocabulary of current data to config
+        """
+        vocab_path = os.path.join(self.Dataset_dir, 'vocab.pkl')
+        assert os.path.exists(vocab_path)
+        with open(vocab_path, 'rb') as f:
+            vocab = pickle.load(f)
+        self.vocab = vocab
 
     def get_exp_id(self):
         """

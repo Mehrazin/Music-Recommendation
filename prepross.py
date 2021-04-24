@@ -20,6 +20,7 @@ import argparse
 def arg_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--test_mode', type=bool_flag, default=False)
+    parser.add_argument('--load_vocab', type=bool_flag, default=True)
     return parser.parse_args()
 
 def load_data(config):
