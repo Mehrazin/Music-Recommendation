@@ -29,7 +29,7 @@ class Config:
         self.Original_user_track_dir = os.path.join(self.Original_lastfm_dir, 'userid-timestamp-artid-artname-traid-traname.tsv')
         self.Original_user_profile_dir = os.path.join(self.Original_lastfm_dir, 'userid-profile.tsv')
         self.Processed_dataset_dir = os.path.join(self.Dataset_dir, 'Final_df_w_sessions.csv')
-        self.Test_dir = os.path.join(self.Dataset_dir, 'Test', '1k-item', 'Datasets')
+        self.Test_dir = os.path.join(self.Dataset_dir, 'Test', '20k-item', 'Datasets')
         assert os.path.exists(self.Test_dir)
         if arg.test_mode:
             self.Dataset_dir = self.Test_dir
@@ -93,10 +93,12 @@ class Config:
         if self.load_model:
             self.reload_path = os.path.join(self.checkpoint_dir, 'model_checkpoint.pth.tar')
             assert os.path.exists(self.reload_path)
+        self.prepare_data = arg.prepare_data
         self.train = True
         self.eval_only = False
         self.save_periodic = True
         self.save_every = arg.save_every
+        self.dump_loss = arg.dump_loss
         self.seed = 10
         self.num_epochs = arg.num_epochs
         self.learning_rate = 0.001

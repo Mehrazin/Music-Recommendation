@@ -10,6 +10,7 @@ from Model import build_model
 import random
 from dataloader import create_data_loader
 from trainer import Trainer
+from prepross import save_data
 
 def arg_parse():
     parser = argparse.ArgumentParser()
@@ -20,6 +21,8 @@ def arg_parse():
     parser.add_argument('--num_epochs', type=int, default=1)
     parser.add_argument('--save_every', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--dump_loss', type=bool_flag, default=True)
+    parser.add_argument('--prepare_data', type=bool_flag, default=False)
     return parser.parse_args()
 
 def set_seed(config):
@@ -46,6 +49,10 @@ def load_data_iterator(config):
 
 
 def main(config):
+    if config.prepare_data:
+        print('==> Data prepration')
+        save_data(config)
+        return
     data_iterator = load_data_iterator(config)
     model = build_model(config)
     trainer = Trainer(config, model, data_iterator)
@@ -53,15 +60,20 @@ def main(config):
     if config.train :
         assert config.eval_only == False
         print('Training Started')
+        loss = []
         if config.load_model:
             trainer.load_checkpoint()
         for epoch in range(config.num_epochs):
             losses = trainer.iter()
+            loss.append(losses)
             if config.save_periodic:
                 if epoch%config.save_every == 0:
                     trainer.save_checkpoint(epoch)
                     print(f'Model saved for epoch = {epoch}')
-
+        if config.dump_loss:
+            path = os.path.join(config.exp_dir, 'loss.pkl')
+            with open(path, 'wb') as f:
+                pickle.dump(loss, f)
 
     elif config.eval_only:
         # evaluator
