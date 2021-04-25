@@ -64,8 +64,10 @@ def main(config):
         if config.load_model:
             trainer.load_checkpoint()
         for epoch in range(config.num_epochs):
-            losses = trainer.iter()
-            loss.append(losses)
+            train_losses = trainer.iter()
+            valid_losses = trainer.eval(mode = 'valid')
+            test_losses = trainer.eval(mode = 'test')
+            loss.append((train_losses, valid_losses, test_losses))
             if config.save_periodic:
                 if epoch%config.save_every == 0:
                     trainer.save_checkpoint(epoch)

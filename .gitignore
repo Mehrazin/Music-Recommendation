@@ -4,7 +4,15 @@ __pycache__
 Dumped/
 
 #Dataset
-Dataset
+*.csv
+*.tsv
+*.pkl
+*.model
+doc2vec.model.trainables.syn1neg.npy
+doc2vec.model.wv.vectors.npy
+
+lastfm-dataset-1K
+
 
 # Utils
 utils

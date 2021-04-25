@@ -32,7 +32,8 @@ class Trainer:
         losses = []
         print_loss_total = 0
         print_loss_avg = 0
-        for batch_idx, batch in enumerate(self.train_iterator):
+        self.model.train()
+        for batch_idx, batch in enumerate(self.test_iterator):
             users, source, target = batch
             target_len = target[0].shape[0]
             users = users.to(self.config.device)
@@ -80,3 +81,28 @@ class Trainer:
         print("=> Loading checkpoint")
         self.model.load_state_dict(checkpoint["state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
+
+    def eval(self, mode):
+        if mode == 'valid':
+            data_iter = self.valid_iterator
+        elif mode == 'test':
+            data_iter = self.test_iterator
+        self.model.eval()
+        with torch.no_grad():
+            losses = []
+            for batch_idx, batch in enumerate(data_iter):
+                users, source, target = batch
+                target_len = target[0].shape[0]
+                users = users.to(self.config.device)
+                source = (source[0].to(self.config.device), source[1].to(self.config.device))
+                target = (target[0].to(self.config.device), target[1].to(self.config.device))
+                output = self.model(self.config, users,source, target)
+
+                output = output[1:].reshape(-1, output.shape[2])
+                target = target[0][1:].reshape(-1)
+
+                loss = self.criterion(output, target)
+
+                # Back prop
+                losses.append(loss.item()/target_len)
+        return losses
