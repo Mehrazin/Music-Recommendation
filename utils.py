@@ -109,6 +109,9 @@ class Config:
         self.teacher_force_ratio = 0.5
         self.grad_clip = True
         self.print_every = 10
+        # Recommenders
+        ## Popularity-based
+        self.num_pop = arg.num_pop
         self.save()
 
 

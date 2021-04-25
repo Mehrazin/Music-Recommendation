@@ -23,6 +23,7 @@ def arg_parse():
     parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--dump_loss', type=bool_flag, default=True)
     parser.add_argument('--prepare_data', type=bool_flag, default=False)
+    parser.add_argument('--num_pop', type=int, default=20)
     return parser.parse_args()
 
 def set_seed(config):
@@ -63,6 +64,9 @@ def main(config):
         loss = []
         if config.load_model:
             trainer.load_checkpoint()
+            path = os.path.join(config.exp_dir,'loss.pkl')
+            with open(path, 'rb') as f:
+                loss = pickle.load(f)
         for epoch in range(config.num_epochs):
             train_losses = trainer.iter()
             valid_losses = trainer.eval(mode = 'valid')
