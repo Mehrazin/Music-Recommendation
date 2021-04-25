@@ -29,7 +29,7 @@ class Config:
         self.Original_user_track_dir = os.path.join(self.Original_lastfm_dir, 'userid-timestamp-artid-artname-traid-traname.tsv')
         self.Original_user_profile_dir = os.path.join(self.Original_lastfm_dir, 'userid-profile.tsv')
         self.Processed_dataset_dir = os.path.join(self.Dataset_dir, 'Final_df_w_sessions.csv')
-        self.Test_dir = os.path.join(self.Dataset_dir, 'Test', '20k-item', 'Datasets')
+        self.Test_dir = os.path.join(self.Dataset_dir, 'Test', '1k-item', 'Datasets')
         assert os.path.exists(self.Test_dir)
         if arg.test_mode:
             self.Dataset_dir = self.Test_dir
@@ -88,6 +88,7 @@ class Config:
         self.tfidf_vector_size = 500
         self.doc2vec_vector_size = 500
         self.doc2vec_epoochs = 50
+        self.emb_dim = 500
         # Training configurations
         self.load_model = arg.load_model
         if self.load_model:

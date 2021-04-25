@@ -32,7 +32,7 @@ class Trainer:
         losses = []
         print_loss_total = 0
         print_loss_avg = 0
-        for batch_idx, batch in enumerate(self.valid_iterator):
+        for batch_idx, batch in enumerate(self.train_iterator):
             users, source, target = batch
             target_len = target[0].shape[0]
             users = users.to(self.config.device)
